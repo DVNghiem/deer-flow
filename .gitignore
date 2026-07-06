@@ -37,7 +37,6 @@ coverage.xml
 coverage/
 .deer-flow/
 .claude/
-skills/custom/*
 logs/
 log/
 debug.log
@@ -60,3 +59,7 @@ config.yaml.bak
 /frontend/playwright-report/
 .gstack/
 .worktrees
+.serena
+.opencode
+.codegraph
+.codebase
