@@ -23,11 +23,12 @@ import type { FileInMessage } from "../messages/utils";
 import type { LocalSettings } from "../settings";
 import { isSidecarThread, SIDECAR_METADATA_KEY } from "../sidecar/thread";
 import { useUpdateSubtask } from "../tasks/context";
+import { taskEventToSubtaskUpdate } from "../tasks/lifecycle";
 import { messageToStep } from "../tasks/steps";
 import type { UploadedFileInfo } from "../uploads";
 import { promptInputFilePartToFile, uploadFiles } from "../uploads";
 
-import { fetchThreadTokenUsage } from "./api";
+import { branchThreadFromTurn, fetchThreadTokenUsage } from "./api";
 import {
   buildThreadsSearchQueryOptions,
   DEFAULT_THREAD_SEARCH_PARAMS,
@@ -1016,12 +1017,20 @@ export function useThreadStream({
       }
     },
     onCustomEvent(event: unknown) {
-      if (
-        typeof event === "object" &&
-        event !== null &&
-        "type" in event &&
-        event.type === "task_running"
-      ) {
+      // Narrow `event.type` once; taskEventToSubtaskUpdate already validated the
+      // task_* events, so the per-branch re-narrowing below reads this single
+      // source of truth instead of re-checking the object shape each time.
+      const eventType =
+        typeof event === "object" && event !== null && "type" in event
+          ? (event as { type: unknown }).type
+          : undefined;
+
+      const taskUpdate = taskEventToSubtaskUpdate(event);
+      if (taskUpdate) {
+        updateSubtask(taskUpdate);
+      }
+
+      if (eventType === "task_running") {
         const e = event as {
           type: "task_running";
           task_id: string;
@@ -1039,17 +1048,11 @@ export function useThreadStream({
         return;
       }
 
-      if (
-        typeof event === "object" &&
-        event !== null &&
-        "type" in event &&
-        event.type === "llm_retry" &&
-        "message" in event &&
-        typeof event.message === "string" &&
-        event.message.trim()
-      ) {
-        const e = event as { type: "llm_retry"; message: string };
-        toast(e.message);
+      if (eventType === "llm_retry") {
+        const e = event as { type: "llm_retry"; message?: unknown };
+        if (typeof e.message === "string" && e.message.trim()) {
+          toast(e.message);
+        }
       }
     },
     onError(error) {
@@ -1995,6 +1998,35 @@ export function useThreadTokenUsage(
   });
 }
 
+export function useBranchThread() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      threadId,
+      messageId,
+      messageIds,
+      title,
+    }: {
+      threadId: string;
+      messageId: string;
+      messageIds?: string[];
+      title?: string;
+    }) => branchThreadFromTurn(threadId, { messageId, messageIds, title }),
+    onSuccess(response, { threadId }) {
+      void queryClient.invalidateQueries({
+        queryKey: ["thread", "metadata", response.thread_id],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["thread", "metadata", threadId],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["threads", "search"] });
+      void queryClient.invalidateQueries({
+        queryKey: INFINITE_THREADS_QUERY_KEY_PREFIX,
+      });
+    },
+  });
+}
+
 export function useRunDetail(threadId: string, runId: string) {
   const apiClient = getAPIClient();
   return useQuery<Run>({
@@ -2015,7 +2047,12 @@ async function deleteLocalThreadData(threadId: string) {
     },
   );
 
-  if (!response.ok) {
+  // A 404 means the thread is already gone — the desired end state. The prior
+  // `apiClient.threads.delete` call hits the same gateway handler (nginx
+  // rewrites /api/langgraph/threads/* to /api/threads/*) and removes the
+  // thread_meta row, so this second delete's ownership guard 404s. Treat it as
+  // success to keep the delete idempotent.
+  if (!response.ok && response.status !== 404) {
     const error = await response
       .json()
       .catch(() => ({ detail: "Failed to delete local thread data." }));
