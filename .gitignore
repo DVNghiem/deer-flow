@@ -65,6 +65,9 @@ config.yaml.bak
 /frontend/playwright-report/
 .gstack/
 .worktrees
+
+# Monocle agent-observability trace output (local file exporter)
+.monocle/
 .serena
 .opencode
 .codegraph
