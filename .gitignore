@@ -43,7 +43,6 @@ coverage.xml
 coverage/
 .deer-flow/
 .claude/
-skills/custom/*
 logs/
 log/
 debug.log
@@ -69,3 +68,7 @@ config.yaml.bak
 
 # Monocle agent-observability trace output (local file exporter)
 .monocle/
+.serena
+.opencode
+.codegraph
+.codebase
