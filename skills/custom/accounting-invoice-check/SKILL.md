@@ -1,7 +1,11 @@
 ---
 name: accounting-invoice-check
-description: Review invoices for completeness and risk flags per Decree 123/2020/ND-CP
-version: 1.0.0
+description: >
+  Kiểm tra hóa đơn thương mại Việt Nam về tính đầy đủ, tuân thủ quy định và
+  cờ rủi ro thuế theo Nghị định 123/2020/NĐ-CP, Luật 48/2024/QH15 và Nghị
+  định 174/2025/NĐ-CP. Trigger khi user cần review hóa đơn đầu vào, đánh
+  giá hóa đơn chi phí được trừ, hoặc chuẩn bị quyết toán thuế.
+version: 1.1.0
 domain: vietnam-accounting
 tags:
   - accounting
@@ -12,63 +16,86 @@ tags:
   - decree-174
 author: DeerFlow Community
 created: 2025-07-06
+updated: 2026-09-09
 legal_basis:
-  - Decree 123/2020/ND-CP
-  - Law 48/2024/QH15
-  - Decree 174/2025/ND-CP
-  - Circular 219/2013/TT-BTC
-  - Circular 78/2021/TT-BTC
-  - Circular 32/2025/TT-BTC
+  - Nghị định 123/2020/NĐ-CP
+  - Luật 48/2024/QH15
+  - Nghị định 174/2025/NĐ-CP
+  - Thông tư 219/2013/TT-BTC
+  - Thông tư 78/2021/TT-BTC
+  - Thông tư 32/2025/TT-BTC
 ---
 
-# Accounting Invoice Check Skill
+# Skill Kiểm tra Hóa đơn Kế toán
 
-## Purpose
+## Mục đích
 
-Review Vietnamese commercial invoices for regulatory compliance, completeness, and tax risk flags. This skill validates invoices against Decree 123/2020/ND-CP mandatory field requirements, tax rate regulations per Article 9 of Law 48/2024/QH15, and identifies common defects that may trigger audit findings or tax authority challenges.
+Rà soát hóa đơn thương mại Việt Nam nhằm kiểm tra tính tuân thủ quy định,
+tính đầy đủ và phát hiện cờ rủi ro thuế. Skill này kiểm tra hóa đơn theo:
+- Yêu cầu trường bắt buộc tại Điều 10, Nghị định 123/2020/NĐ-CP
+- Quy định thuế suất tại Điều 9, Luật 48/2024/QH15
+- Điều kiện khấu trừ thuế GTGT đầu vào
 
-## When to Use
+Từ đó nhận diện các lỗi phổ biến có thể dẫn đến phát hiện kiểm toán hoặc
+truy thu từ cơ quan thuế.
 
-- **Deductible expense review**: Before approving expense claims involving invoices ≥ 20M VND requiring bank transfer proof
-- **Quarterly/annual tax reconciliation**: During tax filing preparation to flag incomplete or risky invoices
-- **Invoice processing automation**: As a checkpoint in accounting workflow systems
-- **Vendor onboarding**: To validate invoice quality before vendor approval
-- **Audit preparation**: To proactively identify and remediate invoice deficiencies
+## Khi nào sử dụng
 
-## When Not to Use
+- **Kiểm tra chi phí được trừ**: Trước khi duyệt đề nghị thanh toán cho hóa
+  đơn từ 20 triệu VND trở lên cần có chứng từ chuyển khoản
+- **Quyết toán thuế quý/năm**: Trong quá trình chuẩn bị tờ khai thuế, phát
+  hiện hóa đơn thiếu chứng từ hoặc có rủi ro
+- **Tự động hóa xử lý hóa đơn**: Làm checkpoint trong hệ thống workflow kế toán
+- **Onboarding nhà cung cấp**: Kiểm tra chất lượng hóa đơn trước khi phê duyệt NCC
+- **Chuẩn bị kiểm toán**: Chủ động phát hiện và khắc phục các thiếu sót
 
-- **Final legal determination**: This skill provides guidance only; consult a licensed tax advisor for definitive legal conclusions
-- **Pre-2015 invoices**: Different regulations apply; specialized review required
-- **E-invoices**: Different validation rules apply; use accounting-invoice-check-einvoice skill
-- **Import/customs declarations**: Not an invoice validation task
+## Khi nào KHÔNG sử dụng
+
+- **Kết luận pháp lý cuối cùng**: Skill chỉ cung cấp hướng dẫn; cần tư vấn
+  thuế có chứng chỉ hành nghề cho kết luận pháp lý chính thức
+- **Hóa đơn trước 2015**: Quy định khác; cần review chuyên biệt
+- **Validate hóa đơn điện tử chuyên sâu** (mã CQT, tra cứu trên Cổng thuế,
+  XML schema): dùng skill `accounting-einvoice`
+- **Tờ khai hải quan / nhập khẩu**: Không phải nghiệp vụ kiểm tra hóa đơn
+
+## Lưu ý về Hóa đơn điện tử (Tóm tắt)
+
+Theo Thông tư 78/2021/TT-BTC (được sửa đổi bởi Thông tư 32/2025/TT-BTC),
+hóa đơn điện tử có yêu cầu bổ sung:
+- Mã CQT (mã xác thực từ cơ quan thuế) phải có
+- XML hóa đơn phải tuân theo định dạng tại Thông tư 78/2021
+- Đối với hóa đơn có mã CQT, có thể tra cứu trên Cổng thuế điện tử
+
+Để validate HĐĐT chuyên sâu (mã CQT, parse XML, đối chiếu với CSDL cơ quan
+thuế), dùng skill riêng `accounting-einvoice`.
 
 ---
 
-## Required Inputs
+## Đầu vào Bắt buộc
 
-| Input | Type | Required | Description |
-|-------|------|----------|-------------|
-| `invoice_data` | object | Yes | Core invoice fields |
-| `invoice_date` | string | Yes | Invoice issue date (YYYY-MM-DD) |
-| `seller_info` | object | Yes | Seller/issuer company details |
-| `buyer_info` | object | Yes | Buyer/recipient company details |
-| `line_items` | array | Yes | Line item breakdown |
-| `tax_breakdown` | object | Yes | Tax rate and amount breakdown |
-| `total_amount` | number | Yes | Total invoice amount in VND |
+| Đầu vào | Kiểu | Bắt buộc | Mô tả |
+|---------|------|----------|-------|
+| `invoice_data` | object | Có | Các trường cốt lõi của hóa đơn |
+| `invoice_date` | string | Có | Ngày phát hành hóa đơn (YYYY-MM-DD) |
+| `seller_info` | object | Có | Thông tin người bán/đơn vị phát hành |
+| `buyer_info` | object | Có | Thông tin người mua/đơn vị nhận |
+| `line_items` | array | Có | Chi tiết các dòng hàng hóa/dịch vụ |
+| `tax_breakdown` | object | Có | Phân tích thuế suất và số thuế |
+| `total_amount` | number | Có | Tổng giá trị hóa đơn (VND) |
 
-### Input Schema
+### Schema đầu vào
 
 ```typescript
 interface InvoiceCheckInput {
   invoice_data: {
-    invoice_number?: string;      // Serial + invoice number
-    invoice_series?: string;       // Required for companies using series
+    invoice_number?: string;      // Số serial + số hóa đơn
+    invoice_series?: string;       // Bắt buộc cho DN dùng ký hiệu
     payment_method?: string;       // cash|bank_transfer|combined
-    adjustment_type?: string;       // For adjusted invoices only
+    adjustment_type?: string;       // Chỉ cho hóa đơn điều chỉnh
   };
-  invoice_date: string;            // ISO date string
+  invoice_date: string;            // Chuỗi ngày ISO
   seller_info: {
-    tax_code: string;              // 10 or 13 digit tax code
+    tax_code: string;              // MST 10 hoặc 13 số
     company_name: string;
     address: string;
     bank_account?: string;
@@ -85,7 +112,7 @@ interface InvoiceCheckInput {
     unit: string;
     unit_price: number;
     total: number;
-    tax_rate?: number;             // 0, 5, or 10 (percent)
+    tax_rate?: number;             // 0, 5, 8, hoặc 10 (%)
   }>;
   tax_breakdown: {
     subtotal_ex_vat: number;
@@ -94,7 +121,7 @@ interface InvoiceCheckInput {
     vat_rates_applied: number[];
   };
   total_amount: number;
-  // Optional supporting evidence
+  // Chứng từ hỗ trợ (tùy chọn)
   supporting_docs?: {
     has_bank_transfer_proof?: boolean;
     has_contract?: boolean;
@@ -106,172 +133,177 @@ interface InvoiceCheckInput {
 
 ---
 
-## Step-by-Step Workflow
+## Quy trình Từng bước
 
-### Step 1: Invoice Type Verification
+### Bước 1: Xác minh loại hóa đơn
 
-**Objective**: Confirm the invoice type matches the transaction nature.
+**Mục tiêu**: Xác nhận loại hóa đơn khớp với bản chất giao dịch.
 
-1. Identify if this is a standard sale/service invoice or an adjusted invoice
-2. For adjusted invoices, verify:
-   - Links to original invoice number and date
-   - Adjustment type is one of: correction, replacement, refund
-   - Adjusted amounts are consistent with correction type
+1. Xác định đây là hóa đơn bán hàng/dịch vụ tiêu chuẩn hay hóa đơn điều chỉnh
+2. Với hóa đơn điều chỉnh, kiểm tra:
+   - Liên kết đến số và ngày hóa đơn gốc
+   - Loại điều chỉnh thuộc một trong: sửa chữa, thay thế, giảm giá
+   - Số tiền điều chỉnh nhất quán với loại điều chỉnh
 
-**Risk flag**: Missing original invoice reference for adjustment invoices.
+**Cờ rủi ro**: Thiếu tham chiếu hóa đơn gốc cho hóa đơn điều chỉnh.
 
-### Step 2: Mandatory Field Check (Article 10, Decree 123/2020/ND-CP)
+### Bước 2: Kiểm tra Trường Bắt buộc (Điều 10, NĐ 123/2020)
 
-**Reference**: [Invoice Requirements Reference](references/invoice-requirements.md)
+**Tham chiếu**: [Yêu cầu Hóa đơn](references/invoice-requirements.md)
 
-Verify ALL mandatory fields per Article 10:
+Kiểm tra TẤT CẢ các trường bắt buộc theo Điều 10:
 
-| Field | Validation |
-|-------|------------|
-| Invoice serial + number | Required, proper format |
-| Issue date | Required, valid date |
-| Seller name | Required, matches tax registration |
-| Seller tax code | Required, 10 or 13 digits |
-| Seller address | Required |
-| Buyer name | Required |
-| Buyer tax code | Required |
-| Buyer address | Required |
-| Line items | At least one item |
-| Unit price | Required, > 0 |
-| Total amount | Required, matches line sum |
-| Tax breakdown | Required if VAT applied |
-| Payment method | Required for amounts ≥ 20M VND |
+| Trường | Kiểm tra |
+|--------|----------|
+| Số serial + số hóa đơn | Bắt buộc, đúng định dạng |
+| Ngày phát hành | Bắt buộc, ngày hợp lệ |
+| Tên người bán | Bắt buộc, khớp đăng ký thuế |
+| MST người bán | Bắt buộc, 10 hoặc 13 số |
+| Địa chỉ người bán | Bắt buộc |
+| Tên người mua | Bắt buộc |
+| MST người mua | Bắt buộc |
+| Địa chỉ người mua | Bắt buộc |
+| Danh sách hàng hóa | Ít nhất 1 dòng |
+| Đơn giá | Bắt buộc, > 0 |
+| Tổng tiền | Bắt buộc, khớp tổng các dòng |
+| Phân tích thuế | Bắt buộc nếu áp VAT |
+| Phương thức thanh toán | Bắt buộc cho hóa đơn từ 20 triệu VND |
 
-**Risk flag**: Any missing mandatory field is flagged with `severity: high`.
+**Cờ rủi ro**: Mọi trường bắt buộc bị thiếu được flag với `severity: high`.
 
-### Step 3: Tax Rate Verification (Article 9, Law 48/2024/QH15)
+### Bước 3: Kiểm tra Thuế suất (Điều 9, Luật 48/2024/QH15)
 
-**Applicable VAT rates per current law**:
+**Thuế suất VAT hiện hành theo quy định**:
 
-| Rate | Applicability |
-|------|---------------|
-| 0% | Essential goods/services (export, healthcare, education, agriculture) |
-| 5% | Essential goods/services (water, medical, education, transportation, etc.) |
-| 8% | Standard rate (10% reduced to 8% per Decree 174/2025/ND-CP through 31 Dec 2026) |
+| Thuế suất | Phạm vi áp dụng |
+|-----------|-----------------|
+| 0% | Hàng hóa/dịch vụ thiết yếu (xuất khẩu, y tế, giáo dục, nông nghiệp) |
+| 5% | Hàng hóa/dịch vụ thiết yếu (nước, y tế, giáo dục, vận tải, ...) |
+| 8% | Thuế suất tiêu chuẩn (10% giảm xuống 8% theo Nghị định 174/2025/NĐ-CP, áp dụng đến 31/12/2026 cho hàng hóa/dịch vụ hiện đang chịu 10%) |
+| 10% | Thuế suất mặc định — áp dụng cho hàng hóa/dịch vụ KHÔNG thuộc diện 0%, 5%, hoặc 8%; cũng áp dụng sau 31/12/2026 nếu Nghị định 174/2025 không được gia hạn |
 
-**Validation checks**:
-1. Verify tax rate is one of: 0%, 5%, or 8% (post Decree 174/2025)
-2. Verify rate matches product/service category
-3. Verify tax calculation: `tax_amount = taxable_amount × rate`
-4. Verify VAT declaration matches invoice amount
+**Các kiểm tra**:
+1. Xác minh thuế suất thuộc một trong: 0%, 5%, 8%, hoặc 10% (theo Điều 9, Luật 48/2024/QH15)
+2. Xác minh thuế suất khớp với loại hàng hóa/dịch vụ
+3. Đối với hóa đơn từ 01/07/2025 đến 31/12/2026: xác minh 8% được áp dụng đúng cho hàng hóa/dịch vụ trước đây chịu 10%
+4. Xác minh tính thuế: `số thuế = giá tính thuế × thuế suất`
+5. Xác minh tờ khai VAT khớp với số liệu trên hóa đơn
 
-**Hypothetical example**:
+**Ví dụ minh họa**:
 ```
-Input: Subtotal = 1,000,000 VND, Rate = 8%, VAT = 80,000 VND
-Calculation check: 1,000,000 × 0.08 = 80,000 ✓
+Đầu vào: Tiền hàng = 1.000.000 VND, Thuế suất = 8%, VAT = 80.000 VND
+Kiểm tra tính toán: 1.000.000 × 0,08 = 80.000 ✓
 ```
 
-### Step 4: Timing Verification (Article 9, Decree 123/2020/ND-CP)
+### Bước 4: Kiểm tra Thời điểm (Điều 9, NĐ 123/2020)
 
-**Timing rules**:
+**Quy tắc thời điểm**:
 
-| Transaction Type | Deadline |
-|-----------------|----------|
-| Goods delivery | Issue on delivery or within end of delivery day |
-| Service provision | Issue when service completed or payment received |
-| Construction/installation | Issue when acceptance occurs |
-| Goods sale with immediate payment | Issue at point of sale |
-| Goods sale on credit | Issue when payment received |
+| Loại giao dịch | Thời hạn |
+|----------------|----------|
+| Giao hàng hóa | Phát hành ngay khi giao hoặc trong ngày kết thúc giao hàng |
+| Cung ứng dịch vụ | Phát hành khi hoàn thành dịch vụ hoặc nhận thanh toán |
+| Xây dựng/lắp đặt | Phát hành khi nghiệm thu |
+| Bán hàng thanh toán ngay | Phát hành tại điểm bán |
+| Bán hàng trả chậm | Phát hành khi nhận thanh toán |
 
-**Validation**:
-1. Check invoice date is not future-dated
-2. Check invoice date is not excessive (> 30 days late without justification)
-3. For adjustments: check adjusted invoice dated after original
+**Kiểm tra**:
+1. Ngày hóa đơn không phải ngày tương lai
+2. Ngày hóa đơn không trễ quá mức (> 30 ngày không có lý do)
+3. Với hóa đơn điều chỉnh: ngày điều chỉnh phải sau ngày gốc
 
-**Risk flag**: Future-dated invoices are `severity: critical`. Late invoices (> 90 days) are `severity: high`.
+**Cờ rủi ro**: Hóa đơn ghi ngày tương lai là `severity: critical`. Hóa đơn
+trễ quá 90 ngày là `severity: high`.
 
-### Step 5: Supporting Evidence Verification (Article 14, Circular 219/2013/TT-BTC)
+### Bước 5: Kiểm tra Chứng từ Hỗ trợ (Điều 14, TT 219/2013/TT-BTC)
 
-**Bank transfer requirement**: For input VAT deduction on invoices ≥ 20,000,000 VND, proof of bank transfer is MANDATORY.
+**Yêu cầu chuyển khoản ngân hàng**: Đối với khấu trừ VAT đầu vào trên hóa
+đơn từ 20.000.000 VND trở lên, BẮT BUỘC phải có chứng từ chuyển khoản.
 
-| Amount | Required Documentation |
-|--------|----------------------|
-| < 20M VND | Invoice + any supporting docs |
-| ≥ 20M VND | Invoice + bank transfer proof |
-| Combined payment | Cash portion documented, bank portion proven |
+| Giá trị | Chứng từ bắt buộc |
+|---------|-------------------|
+| < 20 triệu VND | Hóa đơn + chứng từ hỗ trợ khác (nếu có) |
+| ≥ 20 triệu VND | Hóa đơn + chứng từ chuyển khoản ngân hàng |
+| Thanh toán kết hợp | Phần tiền mặt có chứng từ, phần ngân hàng có xác nhận |
 
-**Validation**:
-1. If total ≥ 20M VND, verify `has_bank_transfer_proof: true`
-2. If partial payment by bank, verify proportional documentation
-3. Verify bank account on invoice matches actual transfer record
+**Kiểm tra**:
+1. Nếu tổng ≥ 20 triệu VND, xác minh `has_bank_transfer_proof: true`
+2. Nếu thanh toán một phần qua ngân hàng, xác minh chứng từ tương ứng
+3. Xác minh tài khoản ngân hàng trên hóa đơn khớp với giao dịch thực tế
 
-**Risk flag**: Missing bank proof for ≥ 20M VND invoices is `severity: critical` for input VAT deduction.
+**Cờ rủi ro**: Thiếu chứng từ chuyển khoản cho hóa đơn ≥ 20 triệu VND là
+`severity: critical` đối với khấu trừ VAT đầu vào.
 
-### Step 6: Risk Flag Assessment
+### Bước 6: Đánh giá Cờ Rủi ro
 
-**Common risk flags**:
+**Các cờ rủi ro phổ biến**:
 
-| Flag | Severity | Description |
-|------|----------|-------------|
-| `missing_mandatory_field` | High | Required field absent |
-| `tax_rate_mismatch` | High | Applied rate doesn't match product category |
-| `calculation_error` | Critical | Math verification failed |
-| `missing_bank_proof` | Critical | ≥ 20M VND without transfer proof |
-| `future_dated` | Critical | Invoice date is in the future |
-| `late_invoice` | Medium | Invoice > 30 days late |
-| `tax_code_invalid` | High | Tax code format incorrect |
-| `unusual_amount` | Low | Amount significantly outside normal range |
-| `round_number` | Low | Suspiciously round total (requires human judgment) |
-| `seller_buyer_same` | High | Seller and buyer tax codes identical |
+| Cờ | Mức độ | Mô tả |
+|----|--------|-------|
+| `missing_mandatory_field` | High | Thiếu trường bắt buộc |
+| `tax_rate_mismatch` | High | Thuế suất áp dụng không khớp loại hàng hóa |
+| `calculation_error` | Critical | Sai lệch khi kiểm tra tính toán |
+| `missing_bank_proof` | Critical | Hóa đơn ≥ 20 triệu VND không có chứng từ CK |
+| `future_dated` | Critical | Ngày hóa đơn trong tương lai |
+| `late_invoice` | Medium | Hóa đơn trễ > 30 ngày |
+| `tax_code_invalid` | High | Định dạng MST không đúng |
+| `unusual_amount` | Low | Số tiền bất thường ngoài phạm vi bình thường |
+| `round_number` | Low | Tổng tiền tròn bất thường (cần xét đoán của con người) |
+| `seller_buyer_same` | High | MST người bán và người mua trùng nhau |
 
-### Step 7: Output Generation
+### Bước 7: Sinh Kết quả
 
-Generate structured output with findings and risk assessment.
-
----
-
-## Data Validation Rules
-
-| Rule | Description | Action if Failed |
-|------|-------------|------------------|
-| `invoice_number_format` | Must contain serial prefix + number | Flag `format_warning` |
-| `tax_code_length` | 10 or 13 digits | Flag `invalid_tax_code` |
-| `amount_positive` | All amounts > 0 | Flag `invalid_amount` |
-| `tax_rate_valid` | Must be 0, 5, or 8 | Flag `invalid_tax_rate` |
-| `line_sum_matches` | Line total = declared subtotal | Flag `calculation_error` |
-| `vat_calculation` | VAT = subtotal × rate | Flag `calculation_error` |
-| `total_matches` | Subtotal + VAT = total | Flag `calculation_error` |
-| `date_valid` | ISO date format, not future | Flag `date_invalid` or `future_dated` |
+Sinh output có cấu trúc với các phát hiện và đánh giá rủi ro.
 
 ---
 
-## Vietnam Legal Verification Checklist
+## Quy tắc Kiểm tra Dữ liệu
 
-### Decree 123/2020/ND-CP Article 10 - Mandatory Fields
-
-- [ ] Invoice serial number and sequential number
-- [ ] Full name, address, tax code of seller
-- [ ] Full name, address, tax code of buyer
-- [ ] Date of invoice issuance
-- [ ] Name, quantity, unit, unit price, total of goods/services
-- [ ] Total amount before VAT
-- [ ] VAT rate and VAT amount (if applicable)
-- [ ] Total amount payable
-
-### Decree 123/2020/ND-CP Article 9 - Timing
-
-- [ ] Invoice issued at time of delivery/service completion
-- [ ] No future dating
-- [ ] No unreasonable delays (> 90 days)
-
-### Article 14, Circular 219/2013/TT-BTC - Input VAT
-
-- [ ] Bank transfer proof present for invoices ≥ 20,000,000 VND
-- [ ] Bank account details on invoice match transfer records
-
-### Decree 174/2025/ND-CP - VAT Rate Reduction
-
-- [ ] Invoice dated 2025-2026 applies 8% standard rate (not 10%)
-- [ ] Transitional treatment correct for invoices straddling effective date
+| Quy tắc | Mô tả | Hành động khi fail |
+|---------|-------|---------------------|
+| `invoice_number_format` | Phải có tiền tố serial + số | Flag `format_warning` |
+| `tax_code_length` | 10 hoặc 13 số | Flag `invalid_tax_code` |
+| `amount_positive` | Mọi số tiền > 0 | Flag `invalid_amount` |
+| `tax_rate_valid` | Phải là 0, 5, 8, hoặc 10 | Flag `invalid_tax_rate` |
+| `line_sum_matches` | Tổng dòng = subtotal khai báo | Flag `calculation_error` |
+| `vat_calculation` | VAT = subtotal × thuế suất | Flag `calculation_error` |
+| `total_matches` | Subtotal + VAT = tổng | Flag `calculation_error` |
+| `date_valid` | Định dạng ISO, không phải tương lai | Flag `date_invalid` hoặc `future_dated` |
 
 ---
 
-## Output Format
+## Checklist Xác minh Pháp lý Việt Nam
+
+### Nghị định 123/2020/NĐ-CP Điều 10 - Trường Bắt buộc
+
+- [ ] Số serial và số thứ tự hóa đơn
+- [ ] Họ tên, địa chỉ, MST người bán
+- [ ] Họ tên, địa chỉ, MST người mua
+- [ ] Ngày phát hành hóa đơn
+- [ ] Tên, số lượng, đơn vị tính, đơn giá, tổng giá hàng hóa/dịch vụ
+- [ ] Tổng giá trước VAT
+- [ ] Thuế suất và số thuế VAT (nếu áp dụng)
+- [ ] Tổng giá thanh toán
+
+### Nghị định 123/2020/NĐ-CP Điều 9 - Thời điểm
+
+- [ ] Hóa đơn phát hành tại thời điểm giao hàng/hoàn thành dịch vụ
+- [ ] Không ghi ngày tương lai
+- [ ] Không trễ bất hợp lý (> 90 ngày)
+
+### Điều 14, Thông tư 219/2013/TT-BTC - VAT đầu vào
+
+- [ ] Có chứng từ chuyển khoản cho hóa đơn ≥ 20.000.000 VND
+- [ ] Tài khoản ngân hàng trên hóa đơn khớp với giao dịch thực tế
+
+### Nghị định 174/2025/NĐ-CP - Giảm thuế suất VAT
+
+- [ ] Hóa đơn phát hành 2025-2026 áp dụng thuế suất 8% tiêu chuẩn (không phải 10%)
+- [ ] Xử lý chuyển tiếp đúng cho hóa đơn bao trùm ngày có hiệu lực
+
+---
+
+## Định dạng Đầu ra
 
 ```json
 {
@@ -310,138 +342,148 @@ Generate structured output with findings and risk assessment.
     {
       "flag": "missing_bank_proof",
       "severity": "critical",
-      "description": "Invoice amount exceeds 20M VND but no bank transfer proof provided",
-      "impact": "Input VAT may not be deductible for this invoice",
-      "recommendation": "Request bank transfer record or document alternative payment proof"
+      "description": "Hóa đơn vượt 20 triệu VND nhưng không có chứng từ chuyển khoản",
+      "impact": "VAT đầu vào có thể không được khấu trừ cho hóa đơn này",
+      "recommendation": "Yêu cầu cung cấp chứng từ chuyển khoản hoặc chứng minh thanh toán khác"
     }
   ],
   "recommendations": [
-    "Request seller to reissue with complete mandatory fields",
-    "Obtain bank transfer proof for input VAT deduction"
+    "Yêu cầu người bán phát hành lại với đầy đủ trường bắt buộc",
+    "Lấy chứng từ chuyển khoản để khấu trừ VAT đầu vào"
   ],
-  "legal_disclaimer": "This review is for guidance only. Consult a licensed Vietnamese tax advisor for official tax advice and deductible expense determination."
+  "legal_disclaimer": "Đây là bản rà soát hướng dẫn. Cần tư vấn thuế có chứng chỉ để có kết luận chính thức về chi phí được trừ."
 }
 ```
 
 ---
 
-## Missing Data Handling
+## Xử lý Dữ liệu Thiếu
 
-| Missing Field | Severity | Handling |
-|---------------|----------|----------|
-| Invoice number | High | Flag, cannot complete review |
-| Invoice date | Critical | Flag, cannot complete review |
-| Seller tax code | High | Flag, cannot verify against tax records |
-| Line items | High | Flag, cannot verify tax calculation |
-| Tax breakdown | Medium | Flag if VAT should be present |
-| Buyer info | High | Flag, required for B2B invoices |
+| Trường thiếu | Mức độ | Xử lý |
+|--------------|--------|-------|
+| Số hóa đơn | High | Flag, không thể hoàn thành rà soát |
+| Ngày hóa đơn | Critical | Flag, không thể hoàn thành rà soát |
+| MST người bán | High | Flag, không thể đối chiếu với CSDL thuế |
+| Danh sách hàng hóa | High | Flag, không thể kiểm tra tính thuế |
+| Phân tích thuế | Medium | Flag nếu phải có VAT |
+| Thông tin người mua | High | Flag, bắt buộc với hóa đơn B2B |
 
-**Protocol**:
-1. If any `Critical` field missing → output `review_status: fail`, stop further checks
-2. If any `High` field missing → output `review_status: fail`, note which checks incomplete
-3. If only `Medium` fields missing → output `review_status: pass_with_warnings`
-4. If low-priority fields missing → include as informational notes
-
----
-
-## Error Handling
-
-### Data Validation Errors
-
-| Error | Response |
-|-------|----------|
-| Invalid date format | Flag `date_invalid`, request clarification |
-| Non-numeric amount | Flag `invalid_amount`, reject invoice |
-| Negative values | Flag `invalid_amount`, reject invoice |
-| Amount exceeds reasonable bounds | Flag `unusual_amount`, escalate for human review |
-
-### Processing Errors
-
-| Error | Response |
-|-------|----------|
-| Missing required input | Output `review_status: fail`, list missing fields |
-| Calculation overflow | Flag `calculation_error`, escalate |
-| Unexpected input format | Flag `format_warning`, attempt best-effort parsing |
+**Quy trình**:
+1. Nếu trường `Critical` thiếu → trả `review_status: fail`, dừng kiểm tra tiếp
+2. Nếu trường `High` thiếu → trả `review_status: fail`, ghi chú kiểm tra chưa hoàn thành
+3. Nếu chỉ trường `Medium` thiếu → trả `review_status: pass_with_warnings`
+4. Nếu trường ưu tiên thấp thiếu → ghi nhận thông tin bổ sung
 
 ---
 
-## Anti-Hallucination Rules (CRITICAL)
+## Xử lý Lỗi
 
-These rules MUST be followed without exception:
+### Lỗi Dữ liệu
 
-### Rule 1: Never Conclude Validity
+| Lỗi | Phản hồi |
+|-----|----------|
+| Định dạng ngày không hợp lệ | Flag `date_invalid`, yêu cầu làm rõ |
+| Số tiền không phải số | Flag `invalid_amount`, từ chối hóa đơn |
+| Giá trị âm | Flag `invalid_amount`, từ chối hóa đơn |
+| Số tiền vượt phạm vi hợp lý | Flag `unusual_amount`, escalate xem xét |
 
-**WRONG**: "This invoice is valid and compliant."
-**RIGHT**: "This invoice appears complete based on provided data. Official validity requires verification through tax authority systems."
+### Lỗi Xử lý
 
-### Rule 2: Never Assume Deductibility
-
-**WRONG**: "The VAT on this invoice is deductible."
-**RIGHT**: "The VAT amount is stated. Deductibility depends on business purpose, proper documentation, and tax authority acceptance."
-
-### Rule 3: Never Fabricate Legal Citations
-
-**WRONG**: "Per Article 5, Circular 123..." (if Circular 123 doesn't exist)
-**RIGHT**: Use ONLY verified citations from known legal instruments. If uncertain, state "based on general understanding of Decree 123/2020/ND-CP" rather than citing specific articles.
-
-### Rule 4: Always Include Disclaimer
-
-**WRONG**: Ending a review without disclaimer
-**RIGHT**: Every output MUST include the legal disclaimer
-
-### Rule 5: Never Override Human Judgment
-
-**WRONG**: "This invoice passes the check, no action needed."
-**RIGHT**: "This invoice passes the automated checks. Final determination should be made by authorized accounting personnel."
-
-### Rule 6: Cite Sources Precisely
-
-**WRONG**: "Per recent changes in VAT law..."
-**RIGHT**: "Per Decree 174/2025/ND-CP, which reduced the standard VAT rate from 10% to 8% effective [date], the applied rate appears correct for this invoice dated [date]."
+| Lỗi | Phản hồi |
+|-----|----------|
+| Thiếu đầu vào bắt buộc | Trả `review_status: fail`, liệt kê trường thiếu |
+| Tràn số khi tính toán | Flag `calculation_error`, escalate |
+| Định dạng đầu vào bất ngờ | Flag `format_warning`, cố gắng parse tốt nhất có thể |
 
 ---
 
-## Escalation Rules
+## Quy tắc Chống Ảo giác (QUAN TRỌNG)
 
-Escalate to human review when:
+Các quy tắc này PHẢI được tuân thủ không ngoại lệ:
 
-| Condition | Reason | Priority |
-|-----------|--------|----------|
-| Calculation error detected | May indicate fraud or data entry error | High |
-| Future-dated invoice | Potential compliance issue | Critical |
-| Missing bank proof for ≥ 20M | Tax deduction at risk | Critical |
-| Tax code validation fails | Seller may not exist | High |
-| Amount > 1B VND | High-value transaction review | High |
-| Pattern of late invoices | Systemic process issue | Medium |
-| All mandatory fields missing | Cannot perform review | Critical |
-| Suspicious patterns detected | Potential fraud | Critical |
+### Quy tắc 1: Không bao giờ kết luận hợp lệ
+
+**SAI**: "Hóa đơn này hợp lệ và tuân thủ."
+**ĐÚNG**: "Hóa đơn có vẻ đầy đủ dựa trên dữ liệu cung cấp. Tính hợp lệ chính
+thức cần xác minh qua hệ thống cơ quan thuế."
+
+### Quy tắc 2: Không bao giờ khẳng định khấu trừ được
+
+**SAI**: "VAT trên hóa đơn này được khấu trừ."
+**ĐÚNG**: "Số VAT được ghi nhận trên hóa đơn. Khả năng khấu trừ phụ thuộc
+vào mục đích kinh doanh, chứng từ đầy đủ và chấp nhận của cơ quan thuế."
+
+### Quy tắc 3: Không bao giờ bịa trích dẫn pháp lý
+
+**SAI**: "Theo Điều 5, Thông tư 123..." (nếu Thông tư 123 không tồn tại)
+**ĐÚNG**: Chỉ sử dụng trích dẫn đã xác minh từ văn bản pháp luật đã biết.
+Nếu không chắc chắn, ghi "dựa trên hiểu biết chung về Nghị định 123/2020/NĐ-CP"
+thay vì trích điều cụ thể.
+
+### Quy tắc 4: Luôn kèm tuyên bố miễn trừ
+
+**SAI**: Kết thúc rà soát mà không có disclaimer
+**ĐÚNG**: Mọi đầu ra PHẢI bao gồm tuyên bố miễn trừ pháp lý
+
+### Quy tắc 5: Không bao giờ thay thế phán đoán con người
+
+**SAI**: "Hóa đơn này pass kiểm tra, không cần làm gì thêm."
+**ĐÚNG**: "Hóa đơn vượt qua kiểm tra tự động. Quyết định cuối cùng cần do
+nhân viên kế toán được ủy quyền đưa ra."
+
+### Quy tắc 6: Trích dẫn chính xác nguồn
+
+**SAI**: "Theo những thay đổi gần đây về luật VAT..."
+**ĐÚNG**: "Theo Nghị định 174/2025/NĐ-CP, giảm thuế suất VAT tiêu chuẩn từ
+10% xuống 8% có hiệu lực từ [ngày], thuế suất áp dụng có vẻ đúng cho hóa
+đơn phát hành ngày [ngày]."
 
 ---
 
-## Legal Disclaimer
+## Quy tắc Escalate
 
-**IMPORTANT**: This skill provides automated review based on document analysis and publicly known Vietnamese tax regulations. This skill does NOT constitute legal advice and should NOT be relied upon as the sole basis for tax decisions.
+Escalate cho người xem xét khi:
 
-**Limitations**:
-- Automated checks cannot verify authenticity against tax authority databases
-- This skill cannot confirm business purpose validity
-- Tax deductibility final determination requires authorized tax professional review
-- Regulations may change; verify current law before making final decisions
-
-**For official guidance**, consult:
-- General Department of Taxation (Tổng cục Thuế)
-- Licensed tax advisors registered in Vietnam
-- Official tax authority publications
-
-**Reference laws** (as of skill creation date):
-- Decree 123/2020/ND-CP dated 19 October 2020
-- Law 48/2024/QH15 (Tax Management Law) passed 21 November 2024
-- Decree 174/2025/ND-CP dated 1 January 2025
-- Circular 219/2013/TT-BTC dated 31 December 2013
-- Circular 78/2021/TT-BTC dated 17 August 2021
-- Circular 32/2025/TT-BTC dated 20 March 2025
+| Điều kiện | Lý do | Ưu tiên |
+|-----------|-------|---------|
+| Phát hiện lỗi tính toán | Có thể là gian lận hoặc nhập liệu sai | High |
+| Hóa đơn ghi ngày tương lai | Vấn đề tuân thủ tiềm ẩn | Critical |
+| Thiếu chứng từ CK cho ≥ 20 triệu | Nguy cơ khấu trừ thuế | Critical |
+| MST không hợp lệ | Người bán có thể không tồn tại | High |
+| Giá trị > 1 tỷ VND | Cần rà soát giao dịch giá trị lớn | High |
+| Mẫu hình hóa đơn trễ | Vấn đề quy trình hệ thống | Medium |
+| Tất cả trường bắt buộc đều thiếu | Không thể thực hiện rà soát | Critical |
+| Phát hiện dấu hiệu nghi ngờ | Gian lận tiềm ẩn | Critical |
 
 ---
 
-*Last updated: 2026-07-06*
-*Skill version: 1.0.0*
+## Tuyên bố Miễn trừ Pháp lý
+
+**QUAN TRỌNG**: Skill này cung cấp rà soát tự động dựa trên phân tích dữ
+liệu và quy định thuế Việt Nam được biết đến công khai. Skill này KHÔNG cấu
+thành tư vấn pháp lý và KHÔNG nên được dùng làm căn cứ duy nhất cho quyết
+định thuế.
+
+**Giới hạn**:
+- Kiểm tra tự động không thể xác minh tính xác thực với CSDL cơ quan thuế
+- Skill không thể xác nhận tính hợp lý về mục đích kinh doanh
+- Quyết định cuối cùng về khấu trừ thuế cần nhân viên thuế có thẩm quyền
+- Quy định có thể thay đổi; xác minh luật hiện hành trước khi quyết định cuối
+
+**Để có hướng dẫn chính thức**, tham khảo:
+- Tổng cục Thuế (gdt.gov.vn)
+- Tư vấn viên thuế được cấp phép tại Việt Nam
+- Ấn phẩm chính thức của cơ quan thuế
+
+**Văn bản tham chiếu** (tại ngày tạo skill):
+- Nghị định 123/2020/NĐ-CP ngày 19/10/2020
+- Luật 48/2024/QH15 (Luật Quản lý thuế) thông qua 21/11/2024
+- Nghị định 174/2025/NĐ-CP ngày 01/01/2025
+- Thông tư 219/2013/TT-BTC ngày 31/12/2013
+- Thông tư 78/2021/TT-BTC ngày 17/08/2021
+- Thông tư 32/2025/TT-BTC ngày 20/03/2025
+
+---
+
+*Cập nhật lần cuối: 2026-09-09*
+*Phiên bản skill: 1.1.0*
