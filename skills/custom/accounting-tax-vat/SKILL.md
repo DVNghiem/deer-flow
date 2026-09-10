@@ -1,417 +1,590 @@
 ---
 name: accounting-tax-vat
-description: VAT compliance checklist and evidence review per Law 48/2024/QH15
-version: 1.0.0
+description: >
+  Kê khai và quyết toán thuế Giá trị gia tăng (VAT) Việt Nam theo Luật
+  48/2024/QH15, Nghị định 174/2025/NĐ-CP, Thông tư 219/2013/TT-BTC. Trigger
+  khi user cần: lập tờ khai thuế GTGT (mẫu 01/GTGT), xác định thuế suất
+  (0%/5%/8%/10%), kiểm tra điều kiện khấu trừ VAT đầu vào, lập bảng kê
+  hóa đơn, hoặc quyết toán thuế cuối năm.
+version: 1.1.0
 domain: vietnam-accounting
+tags:
+  - accounting
+  - vietnam
+  - vat
+  - tax-filing
+  - tax-finalization
+  - input-vat-deduction
+author: DeerFlow Community
+created: 2025-07-06
+updated: 2026-09-09
+legal_basis:
+  - Luật 48/2024/QH15 (Luật Quản lý thuế)
+  - Luật Thuế GTGT 2024 (sửa đổi Luật 13/2008)
+  - Nghị định 174/2025/NĐ-CP
+  - Nghị định 123/2020/NĐ-CP
+  - Thông tư 219/2013/TT-BTC
+  - Thông tư 78/2021/TT-BTC
+  - Thông tư 32/2025/TT-BTC
 ---
 
-# Accounting Tax VAT Skill
+# Skill Thuế GTGT Việt Nam
 
-## Purpose
+## Mục đích
 
-This skill provides a structured compliance checklist and evidence review framework for Value Added Tax (VAT) under Vietnam's Law 48/2024/QH15. It verifies VAT rates, validates input VAT deduction conditions, and checks VAT refund eligibility.
+Hỗ trợ kê khai và quyết toán **thuế Giá trị gia tăng (VAT)** tại Việt Nam:
+- Xác định thuế suất áp dụng
+- Kiểm tra điều kiện khấu trừ VAT đầu vào
+- Lập tờ khai thuế GTGT (mẫu 01/GTGT)
+- Lập bảng kê hóa đơn đầu vào / đầu ra
+- Quyết toán thuế cuối năm
 
-**Scope:** Evidence review and compliance checklist ONLY. This skill does NOT provide tax advice, tax planning recommendations, or tax calculation services.
+Tuân thủ theo:
+- Luật 48/2024/QH15 — Luật Quản lý thuế
+- Luật Thuế GTGT 2024 — sửa đổi Luật 13/2008/QH12 (có hiệu lực từ
+  01/07/2025)
+- Nghị định 174/2025/NĐ-CP — giảm thuế suất VAT tiêu chuẩn 10% → 8%
+  trong giai đoạn 01/07/2025 – 31/12/2026
+- Thông tư 219/2013/TT-BTC — hướng dẫn thi hành Luật VAT cũ (vẫn áp dụng
+  một số điều)
 
-## When to Use
+## Khi nào sử dụng
 
-- Reviewing VAT invoices for compliance with Law 48/2024/QH15
-- Verifying input VAT deduction eligibility for business expenses
-- Checking VAT refund application completeness
-- Auditing VAT returns before submission
-- Validating that VAT rates applied match legal requirements
-- Reviewing payment evidence for input VAT claims (transactions ≥20,000,000 VND)
+- **Lập tờ khai thuế GTGT khấu trừ** (mẫu 01/GTGT) hàng tháng/quý
+- **Lập tờ khai thuế GTGT trực tiếp** (mẫu 02/GTGT, 03/GTGT)
+- **Xác định thuế suất VAT** cho hàng hóa/dịch vụ cụ thể
+- **Kiểm tra điều kiện khấu trừ VAT đầu vào**
+- **Lập bảng kê hóa đơn** (mẫu 01-1/GTGT, 01-2/GTGT, 01-3/GTGT, ...)
+- **Quyết toán thuế GTGT cuối năm** (mẫu 02-1/GTGT khi có điều chỉnh)
+- **Tư vấn nội bộ về điều kiện khấu trừ, hóa đơn hợp lệ**
 
-## When NOT to Use
+## Khi nào KHÔNG sử dụng
 
-- Calculating VAT amounts or tax liability
-- Providing tax planning advice or optimization strategies
-- Filing VAT returns or submitting refund applications
-- Interpreting ambiguous tax situations requiring professional judgment
-- Replacing consultation with a qualified tax advisor
-
-## Required Inputs
-
-The following inputs must be provided to execute this skill:
-
-| Input | Type | Required | Description |
-|-------|------|----------|-------------|
-| `vat_method` | string | Yes | "credit" (input-output method) or "direct" (percentage on revenue) |
-| `output_vat` | array | Yes | List of output VAT transactions (sales) |
-| `output_vat[].invoice_number` | string | Yes | Invoice identifier |
-| `output_vat[].date` | string | Yes | Invoice date (YYYY-MM-DD) |
-| `output_vat[].amount_vnd` | number | Yes | Total invoice amount in VND |
-| `output_vat[].vat_rate` | number | Yes | VAT rate applied (0, 5, 8, or 10 percent) |
-| `output_vat[].service_type` | string | Yes | Description of goods/services |
-| `input_vat` | array | Yes | List of input VAT transactions (purchases) |
-| `input_vat[].invoice_number` | string | Yes | Invoice identifier |
-| `input_vat[].date` | string | Yes | Invoice date (YYYY-MM-DD) |
-| `input_vat[].amount_vnd` | number | Yes | Total invoice amount in VND |
-| `input_vat[].vat_amount` | number | Yes | VAT amount claimed in VND |
-| `input_vat[].vat_rate` | number | Yes | VAT rate on invoice |
-| `input_vat[].service_type` | string | Yes | Description of goods/services |
-| `invoices` | array | Yes | Supporting VAT invoices for review |
-| `payment_evidence` | array | Yes | Bank transfer records for transactions ≥20M VND |
-
-## Step-by-Step Workflow
-
-### Step 1: Identify VAT Method
-
-Determine the applicable VAT method based on business type and characteristics:
-
-| Method | Applicable To | Key Characteristic |
-|--------|---------------|-------------------|
-| Credit Method | General businesses with proper accounting | Deduct input VAT against output VAT |
-| Direct Method | Small businesses, specific industries | Applied as percentage of revenue |
-
-**Action:** Verify method consistency throughout the review period.
-
-### Step 2: Verify Output VAT
-
-For each output VAT transaction, verify:
-
-1. VAT rate matches the service/good type per Article 9, Law 48/2024/QH15
-2. Invoice contains all required fields per Decree 209/2013/ND-CP
-3. Tax period correctly reported
-
-**Reference:** See VAT Rate Verification Checklist below.
-
-### Step 3: Verify Input VAT Credits
-
-For each input VAT transaction, verify:
-
-1. Invoice is a legitimate VAT invoice with valid serial number
-2. Goods/services are for business purposes
-3. Payment evidence exists for transactions ≥20,000,000 VND per Article 14, Circular 219/2013/TT-BTC
-4. Invoice date falls within the review period
-
-**Reference:** See Input VAT Deduction Conditions Checklist below.
-
-### Step 4: Check Deduction Conditions
-
-Verify all four conditions per Article 14, Law 48/2024/QH15:
-
-1. **Condition 1:** Payment made via bank transfer (for amounts ≥20,000,000 VND)
-2. **Condition 2:** Goods/services used for VAT-taxable production/business activities
-3. **Condition 3:** Valid VAT invoice or equivalent supporting document
-4. **Condition 4:** Goods/services actually received and verified
-
-**Reference:** See Input VAT Deduction Conditions Checklist below.
-
-### Step 5: Check VAT Refund Eligibility
-
-If VAT refund is claimed, verify eligibility per Article 15, Law 48/2024/QH15:
-
-1. Excess input VAT carried forward from previous periods
-2. Export transactions with 0% VAT
-3. Foreign diplomatic missions and international organizations
-4. Compliance with minimum documentation requirements
-
-**Reference:** See VAT Refund Conditions Checklist below.
-
-### Step 6: Flag Issues
-
-Compile all identified discrepancies and compliance gaps:
-
-- Missing payment evidence for high-value transactions
-- Incorrect VAT rate applications
-- Missing or invalid invoice fields
-- Incomplete supporting documentation
-- Timing mismatches between invoice and payment
+- **Thuế TNDN**: dùng `accounting-corporate-income-tax`
+- **Thuế TNCN**: dùng `accounting-payroll`
+- **Validate hóa đơn đầu vào** (kiểm tra trường, format): dùng
+  `accounting-invoice-check` hoặc `accounting-einvoice`
+- **Tư vấn pháp lý cuối cùng**: cần tư vấn viên thuế có chứng chỉ
 
 ---
 
-## VAT Rate Verification Checklist
+## Đầu vào Bắt buộc
 
-Per **Article 9, Law 48/2024/QH15** (effective 01/07/2025):
+### Đầu vào Chung
 
-### 0% VAT Rate
+| Đầu vào | Kiểu | Bắt buộc | Mô tả |
+|---------|------|----------|-------|
+| `period` | object | Có | Kỳ tính thuế: `{type, year, month, quarter}` |
+| `company_info` | object | Có | Tên DN, MST, địa chỉ, kỳ kế toán |
+| `filing_method` | enum | Có | `"monthly"` hoặc `"quarterly"` |
+| `vat_method` | enum | Có | `"deduction"` (khấu trừ) hoặc `"direct"` (trực tiếp) |
+| `sales_invoices` | array | Có | Hóa đơn đầu ra trong kỳ |
+| `purchase_invoices` | array | Có | Hóa đơn đầu vào trong kỳ |
 
-Applies to exports and international transport:
+### Đầu vào Riêng theo Phương pháp
 
-- [ ] Goods exported outside Vietnam
-- [ ] Services consumed outside Vietnam
-- [ ] International transportation services
-- [ ] Goods and services for diplomatic missions
-- [ ] Goods and services for aid and humanitarian purposes
+#### Phương pháp Khấu trừ (Deduction)
 
-**Legal Reference:** Article 9(1), Law 48/2024/QH15
+| Đầu vào | Kiểu | Bắt buộc | Mô tả |
+|---------|------|----------|-------|
+| `input_vat_breakdown` | object | Có | VAT đầu vào theo thuế suất và loại |
+| `output_vat_breakdown` | object | Có | VAT đầu ra theo thuế suất |
+| `carryover_vat` | number | Tùy chọn | VAT nộp thừa từ kỳ trước |
+| `adjustments` | array | Tùy chọn | Điều chỉnh thuế (giảm giá, hàng khuyến mại, ...) |
 
-### 5% VAT Rate
+#### Phương pháp Trực tiếp (Direct)
 
-Applies to essential goods and services:
-
-- [ ] Clean water for production and daily use
-- [ ] Fertilizers, pesticides, agricultural tools
-- [ ] Teaching equipment, scientific equipment
-- [ ] Medical equipment and assistive devices
-- [ ] News, press, and official publications
-- [ ] Art performances and cultural events (domestic)
-- [ ] Children's toys and books
-- [ ] Food products in their natural state or basic processing
-- [ ] Protective equipment for production safety
-
-**Legal Reference:** Article 9(2), Law 48/2024/QH15
-
-### 8% VAT Rate
-
-**Temporary reduction** per Decree 174/2025/ND-CP (until 31/12/2026):
-
-- [ ] Goods and services currently subject to 10% rate
-- [ ] Applicable to domestic transactions during reduction period
-
-**Legal Reference:** Article 1, Decree 174/2025/ND-CP
-
-**Note:** This is a temporary reduction. Rate reverts to 10% from 01/01/2027 unless extended.
-
-### 10% VAT Rate
-
-**Default rate** applies when no other rate applies:
-
-- [ ] All other goods and services not covered by 0%, 5%, or 8% rates
-
-**Legal Reference:** Article 9(4), Law 48/2024/QH15
+| Đầu vào | Kiểu | Bắt buộc | Mô tả |
+|---------|------|----------|-------|
+| `revenue_total` | number | Có | Tổng doanh thu trong kỳ |
+| `industry_tier` | enum | Có | Phân ngành theo Thông tư 219 |
 
 ---
 
-## Input VAT Deduction Conditions Checklist
+## Thuế suất VAT hiện hành (2026)
 
-Per **Article 14, Law 48/2024/QH15** (effective 01/07/2025):
+Theo Luật Thuế GTGT 2024 và Nghị định 174/2025/NĐ-CP:
 
-### Condition 1: Payment Method (Article 14(1))
+| Thuế suất | Phạm vi | Có hiệu lực |
+|-----------|---------|-------------|
+| **0%** | Hàng hóa/dịch vụ xuất khẩu, vận tải quốc tế, hàng hóa/dịch vụ thiết yếu theo Phụ lục | Luôn |
+| **5%** | Hàng hóa/dịch vụ thiết yếu: nước sạch, y tế, giáo dục, nông nghiệp, vận tải công cộng, sách, ... | Luôn |
+| **8%** | **Thuế suất tiêu chuẩn** (giảm từ 10% theo NĐ 174/2025) cho hàng hóa/dịch vụ thông thường | 01/07/2025 – 31/12/2026 |
+| **10%** | Thuế suất tiêu chuẩn (mặc định) — áp dụng cho HH/DV không thuộc diện 0%, 5%, 8%; và áp dụng SAU 31/12/2026 nếu NĐ 174/2025 không gia hạn | Luôn (mặc định) |
 
-For transactions **≥20,000,000 VND**:
+### Lưu ý quan trọng về thuế suất 8% (NĐ 174/2025)
 
-- [ ] Payment made via bank transfer
-- [ ] Bank transfer record matches invoice details
-- [ ] Transfer date is on or after invoice date
-- [ ] Transfer amount covers full invoice or documented installment
+- Áp dụng cho **hóa đơn phát hành** trong giai đoạn từ 01/07/2025 đến
+  31/12/2026
+- Giảm từ thuế suất 10% tiêu chuẩn xuống 8%
+- **KHÔNG áp dụng** cho:
+  - Hàng hóa/dịch vụ đã chịu 5%
+  - Hàng hóa/dịch vụ đã chịu 0%
+  - Hàng hóa/dịch vụ không chịu VAT (theo Điều 5, Luật 48/2024/QH15)
+- Đối với hóa đơn bao trùm ngày 30/06/2025 và 01/07/2025: áp dụng theo
+  ngày phát hành hóa đơn
 
-**Legal Reference:** Article 14(1), Law 48/2024/QH15; Article 14, Circular 219/2013/TT-BTC
+### Xác định thuế suất cho hàng hóa/dịch vụ
 
-**Exception:** Cash payment permitted when:
-- Paying taxes and state fees to state treasury
-- Paying for goods/services in remote areas without banking services
-- Other exceptions per current regulations
+Theo Điều 9, Luật 48/2024/QH15 và Phụ lục kèm theo:
 
-### Condition 2: Business Purpose (Article 14(2))
+| Nhóm | Thuế suất | Ví dụ |
+|------|-----------|-------|
+| Hàng hóa/dịch vụ xuất khẩu | 0% | Hàng hóa xuất khẩu, dịch vụ cung cấp cho tổ chức nước ngoài |
+| Nông sản chưa qua chế biến | 0% | Lúa, ngô, rau quả tươi (một số) |
+| Dịch vụ y tế, giáo dục | 0% / 5% | Khám chữa bệnh, dạy học |
+| Hàng thiết yếu | 5% | Nước sạch, sách, dược phẩm |
+| Vận tải công cộng | 5% | Xe buýt, tàu điện (một số) |
+| Tiêu chuẩn (mặc định) | 8% (gđ 2025-2026) / 10% | Đồ gia dụng, quần áo, điện tử, dịch vụ thông thường |
+| Hàng hóa/dịch vụ không chịu VAT | Không | Theo Điều 5, Luật 48/2024 |
 
-- [ ] Goods/services used for VAT-taxable production activities
-- [ ] Goods/services used for VAT-taxable business operations
-- [ ] Clear nexus between purchased goods/services and taxable output
-- [ ] No personal or non-business use included
-
-**Legal Reference:** Article 14(2), Law 48/2024/QH15
-
-### Condition 3: Valid Documentation (Article 14(3))
-
-- [ ] VAT invoice with proper serial number and format
-- [ ] All required invoice fields completed (seller, buyer, description, amount, VAT)
-- [ ] Invoice not from cancelled or suspended taxpayer
-- [ ] Invoice not from businesses without proper tax registration
-- [ ] Electronic invoice submitted to tax authority (if applicable)
-
-**Legal Reference:** Article 14(3), Law 48/2024/QH15
-
-### Condition 4: Goods/Services Received (Article 14(4))
-
-- [ ] Goods physically received or documented completion for services
-- [ ] No fictitious or incomplete transactions
-- [ ] Actual delivery supported by receiving documentation
-- [ ] Warehouse receipts, service completion reports, or equivalent
-
-**Legal Reference:** Article 14(4), Law 48/2024/QH15
+> ⚠️ **Cần xác minh**: Phụ lục thuế suất 5% được sửa đổi bổ sung theo từng
+> thời kỳ. Tra cứu văn bản hiện hành trước khi xác định.
 
 ---
 
-## VAT Refund Conditions Checklist
+## Phương pháp Tính thuế
 
-Per **Article 15, Law 48/2024/QH15** (effective 01/07/2025):
+### Phương pháp Khấu trừ (Deduction)
 
-### Eligible for Refund (Article 15(1))
+Áp dụng cho: DN, hợp tác xã có doanh thu > 1 tỷ VND/năm, hoặc tự nguyện
+đăng ký.
 
-- [ ] Input VAT exceeds output VAT in the tax period
-- [ ] Excess carried forward from previous period
-- [ ] Export of goods/services with 0% VAT
-- [ ] Goods/services supplied to diplomatic missions and international organizations
-- [ ] Newly established investment projects (under specific conditions)
-- [ ] Organizations with VAT-exempt activities generating excess input VAT
+**Công thức**:
 
-### Documentation Requirements (Article 15(2))
+```
+VAT phải nộp = VAT đầu ra - VAT đầu vào được khấu trừ
+            + VAT đầu vào không được khấu trừ (nếu có)
+            ± Điều chỉnh thuế của kỳ trước
+            - VAT nộp thừa kỳ trước (nếu có)
+```
 
-- [ ] Completed VAT refund application form
-- [ ] VAT return for the claimed period
-- [ ] List of VAT invoices (input)
-- [ ] List of VAT invoices (output)
-- [ ] Bank transfer records for transactions ≥20M VND
-- [ ] Export documentation (for export-related refunds)
-- [ ] Contract or agreement for long-term projects
-- [ ] Minutes of goods receipt or service completion
+Trong đó:
 
-### Ineligible Situations
+```
+VAT đầu ra = Σ (giá tính thuế × thuế suất) của tất cả hóa đơn bán ra trong kỳ
 
-- [ ] Tax evasion or fraud suspected
-- [ ] Missing documentation as outlined above
-- [ ] Non-compliance with other tax regulations
-- [ ] Tax debt outstanding
-- [ ] Recently established businesses under scrutiny period
+VAT đầu vào = Σ (giá tính thuế × thuế suất) của các hóa đơn mua vào
+             được khấu trừ theo điều kiện (xem dưới)
+```
+
+### Phương pháp Trực tiếp trên GTGT (Direct Value Added)
+
+Áp dụng cho: DN có doanh thu ≤ 1 tỷ VND/năm không theo phương pháp khấu trừ.
+
+**Công thức**:
+
+```
+VAT phải nộp = Giá trị gia tăng × Tỷ lệ % thuế GTGT
+```
+
+Trong đó:
+
+| Phân ngành | Tỷ lệ % |
+|------------|---------|
+| Phân phối, cung cấp hàng hóa | 1% |
+| Dịch vụ, xây dựng không bao thầu NVL | 5% |
+| Sản xuất, vận tải, dịch vụ có gắn với hàng hóa, xây dựng có bao thầu NVL | 3% |
+| Hoạt động kinh doanh khác | 2% |
+
+> ⚠️ **Cần xác minh**: Tỷ lệ % thuế suất trực tiếp có thể đã thay đổi theo
+> các sửa đổi của Luật VAT 2024.
+
+### Phương pháp Trực tiếp trên Doanh thu (Direct Revenue)
+
+Áp dụng cho: cá nhân, hộ kinh doanh không theo phương pháp khấu trừ, doanh
+thu từ hoạt động vàng/bạc/đá quý.
+
+**Công thức**:
+
+```
+VAT phải nộp = Doanh thu tính thuế × Tỷ lệ % thuế GTGT
+```
+
+Trong đó:
+
+| Loại doanh thu | Tỷ lệ % |
+|----------------|---------|
+| Vàng, bạc, đá quý | 10% (chưa bao gồm thuế VAT) |
 
 ---
 
-## Output Format
+## Điều kiện Khấu trừ VAT đầu vào
 
-The skill returns results in JSON format:
+Để được khấu trừ, VAT đầu vào phải đáp ứng **đồng thời** các điều kiện
+sau:
+
+### Điều kiện 1: Có hóa đơn hợp lệ
+
+- HĐĐT có mã CQT (cho B2B) — xem skill `accounting-einvoice`
+- Hóa đơn giấy còn hiệu lực (chỉ trong trường hợp đặc biệt)
+- Đầy đủ các trường bắt buộc theo Điều 10, NĐ 123/2020/NĐ-CP
+- Ngày hóa đơn trong kỳ khai thuế hoặc kỳ trước liền kề (nếu chưa kê khai)
+- **Không thuộc hóa đơn bị hủy, thay thế, điều chỉnh** mà không cập nhật
+
+### Điều kiện 2: Có chứng từ thanh toán (cho hóa đơn ≥ 20 triệu VND)
+
+Theo Khoản 11, Điều 1, Nghị định 100/2016/NĐ-CP (sửa đổi NĐ 51/2010):
+
+> Khi mua hàng hóa, dịch vụ từ 20 triệu VND trở lên phải có chứng từ
+> thanh toán qua ngân hàng.
+
+Chứng từ hợp lệ:
+- UNC (ủy nhiệm chi) qua ngân hàng
+- Séc chuyển khoản
+- Giấy nộp tiền vào NSNN (nếu thanh toán cho cơ quan nhà nước)
+- Xác nhận chuyển tiền qua mobile/internet banking (kèm sao kê)
+
+### Điều kiện 3: Phục vụ hoạt động SXKD chịu VAT
+
+| Được khấu trừ | KHÔNG được khấu trừ |
+|---------------|---------------------|
+| Hàng hóa/dịch vụ dùng cho SXKD chịu VAT | Hàng hóa/dịch vụ dùng cho hoạt động không chịu VAT |
+| Đầu vào cho xuất khẩu | Hàng hóa/dịch vụ dùng cho hoạt động miễn thuế |
+| Đầu vào cho cả hai hoạt động → phân bổ theo tỷ lệ doanh thu | Đầu vào cho hoạt động tài chính, chuyển nhượng vốn |
+
+> ⚠️ Trường hợp DN có cả hoạt động chịu VAT và không chịu VAT, phải phân
+> bổ VAT đầu vào theo tỷ lệ doanh thu (Điều 10, TT 219/2013/TT-BTC).
+
+### Điều kiện 4: Hóa đơn ghi đúng người mua
+
+Hóa đơn phải ghi:
+- Tên và MST của DN đang kê khai (KHÔNG phải chi nhánh khác)
+- Hoặc chi nhánh được phép riêng (nếu DN đăng ký kê khai riêng)
+
+### Điều kiện 5: Hạch toán đúng tài khoản
+
+- VAT đầu vào hạch toán vào TK 1331 (theo TT 200/TT 99) hoặc TK 133
+  (theo TT 133)
+- Phân bổ cho phù hợp với hoạt động SXKD
+
+---
+
+## Trường hợp KHÔNG được khấu trừ
+
+Theo Điều 10, Nghị định 174/2025/NĐ-CP:
+
+| Trường hợp | Hướng dẫn |
+|-----------|-----------|
+| Hàng hóa/dịch vụ dùng cho hoạt động không chịu VAT | Hạch toán vào chi phí (đã bao gồm VAT) |
+| Hàng hóa/dịch vụ dùng cho hoạt động miễn thuế | Tương tự |
+| Chi phí không có hóa đơn (không đủ điều kiện) | Hạch toán vào chi phí |
+| Hóa đơn không hợp lệ | Hạch toán vào chi phí |
+| Hàng hóa thiếu không rõ nguyên nhân (có dấu hiệu gian lận) | Phải giảm trừ VAT đầu vào tương ứng |
+| Phần VAT vượt mức khấu trừ cho ô tô | Theo quy định cụ thể |
+| Tiền thuê nhà, điện, nước dùng cho cá nhân | Hạch toán vào chi phí cá nhân |
+| Chi phí quà tặng, hỗ trợ không phục vụ SXKD | Hạch toán vào chi phí không được trừ |
+
+---
+
+## Quy trình Kê khai Thuế
+
+### Kê khai theo Tháng (mặc định)
+
+**Thời hạn nộp tờ khai**: Ngày 20 của tháng tiếp theo tháng phát sinh nghĩa
+vụ thuế.
+
+**Hồ sơ khai thuế**:
+1. Tờ khai thuế GTGT (mẫu 01/GTGT)
+2. Bảng kê hóa đơn bán ra (mẫu 01-1/GTGT)
+3. Bảng kê hóa đơn mua vào (mẫu 01-2/GTGT)
+4. Bảng kê hàng hóa/dịch vụ bán ra (nếu có)
+
+### Kê khai theo Quý (doanh thu ≤ 50 tỷ VND/năm)
+
+**Điều kiện**: Tổng doanh thu bán ra của năm trước liền kề ≤ 50 tỷ VND (trừ
+trường hợp bắt buộc theo tháng).
+
+**Thời hạn nộp**: Ngày cuối cùng của tháng đầu quý sau.
+
+**Lưu ý**: Nếu kê khai theo quý, được trừ 2% VAT phải nộp (theo Nghị định
+số 174/2025 hoặc văn bản hiện hành). Cần kiểm tra quy định mới nhất.
+
+### Quyết toán thuế cuối năm
+
+- Hạn nộp: Ngày cuối cùng của tháng thứ 3 kể từ ngày kết thúc năm tài chính
+  (thường là 31/03 năm sau)
+- Mẫu tờ khai quyết toán: 02/GTGT (TT 80/2019 hoặc văn bản mới hơn)
+- Kèm bảng kê điều chỉnh nếu có sai sót trong năm
+
+---
+
+## Quy trình Từng bước để Lập Tờ khai
+
+### Bước 1: Tổng hợp Doanh thu (đầu ra)
+
+Tổng hợp tất cả hóa đơn bán ra trong kỳ, phân loại theo thuế suất:
+
+```json
+{
+  "total_revenue": 1000000000,
+  "by_rate": [
+    {
+      "rate": 10,
+      "revenue_excl_vat": 500000000,
+      "output_vat": 50000000
+    },
+    {
+      "rate": 8,
+      "revenue_excl_vat": 300000000,
+      "output_vat": 24000000
+    },
+    {
+      "rate": 5,
+      "revenue_excl_vat": 100000000,
+      "output_vat": 5000000
+    },
+    {
+      "rate": 0,
+      "revenue_excl_vat": 100000000,
+      "output_vat": 0
+    }
+  ],
+  "total_output_vat": 79000000
+}
+```
+
+### Bước 2: Tổng hợp VAT đầu vào được khấu trừ
+
+Phân loại theo thuế suất:
+
+```json
+{
+  "total_input_vat": 45000000,
+  "by_rate": [
+    { "rate": 10, "input_vat": 30000000 },
+    { "rate": 8, "input_vat": 12000000 },
+    { "rate": 5, "input_vat": 3000000 }
+  ]
+}
+```
+
+### Bước 3: Tính VAT phải nộp
+
+```
+VAT phải nộp = VAT đầu ra - VAT đầu vào được khấu trừ
+             = 79.000.000 - 45.000.000
+             = 34.000.000 VND
+```
+
+### Bước 4: Kiểm tra chéo
+
+| Kiểm tra | Cách thực hiện |
+|-----------|----------------|
+| Tổng Nợ 3331 + 3332 = VAT đầu ra | Đối chiếu sổ cái |
+| Tổng Có 133 = VAT đầu vào | Đối chiếu sổ cái |
+| VAT nộp kỳ này khớp với tờ khai | Đối chiếu UNC |
+
+### Bước 5: Điều chỉnh (nếu có)
+
+| Điều chỉnh | Xử lý |
+|-----------|-------|
+| Giảm giá hàng bán | Điều chỉnh giảm DT và VAT đầu ra |
+| Hàng khuyến mại | Theo quy định cụ thể (có thể không phải điều chỉnh DT) |
+| Hóa đơn sai → xuất lại | Điều chỉnh kỳ phát hiện |
+| Phát hiện hóa đơn đầu vào thiếu kỳ trước | Khai bổ sung |
+
+---
+
+## Điều chỉnh Thuế và Xử lý Sai sót
+
+### Sai sót trong cùng kỳ kê khai
+
+- Phát hiện và sửa trước khi nộp tờ khai
+- Không cần lập tờ khai bổ sung
+
+### Sai sót đã nộp tờ khai (cùng năm tài chính)
+
+- Lập **Tờ khai bổ sung** (mẫu 01/GTGT - BS)
+- Nộp phạt nếu thiếu thuế (có thể miễn/giảm nếu tự giác khai bổ sung)
+- Lãi chậm nộp (0,03%/ngày trên số thuế nộp thiếu)
+
+### Sai sót năm trước (đã quyết toán)
+
+- Lập **Tờ khai bổ sung cho quyết toán** (mẫu 02/GTGT - BS)
+- Phạt + lãi chậm nộp (nếu thiếu thuế)
+- Tự giác khai bổ sung → có thể miễn/giảm phạt
+
+---
+
+## Các Tình huống Đặc biệt
+
+### 1. Xuất khẩu (VAT 0%)
+
+Điều kiện:
+- Có tờ khai hải quan điện tử
+- Hàng hóa thực xuất qua cửa khẩu Việt Nam
+- Thanh toán qua ngân hàng (trừ một số trường hợp)
+- Hóa đơn ghi rõ "xuất khẩu" + mã số hải quan
+
+> Cần có bảng kê riêng cho hàng hóa/dịch vụ xuất khẩu.
+
+### 2. Hoàn thuế VAT
+
+Theo Điều 26, Luật 48/2024/QH15:
+
+**Trường hợp được hoàn**:
+- Dự án đầu tư (chưa hoàn thành, hoặc đã hoàn thành trong giai đoạn đầu tư)
+- Hàng hóa/dịch vụ xuất khẩu (một số trường hợp)
+- DN nộp thừa trong kỳ (tự động khấu trừ kỳ sau hoặc hoàn)
+
+**Hồ sơ hoàn thuế**:
+- Tờ khai thuế hoàn
+- Hợp đồng, hóa đơn, chứng từ
+- Xác nhận của ngân hàng (nếu thanh toán ra nước ngoài)
+- Hồ sơ kiểm tra tại trụ sở (nếu DN lần đầu hoàn)
+
+### 3. Giảm trừ VAT đầu vào
+
+Trường hợp phải giảm trừ:
+- Hàng thiếu không rõ nguyên nhân (xem `accounting-stocktake`)
+- Hàng hóa sử dụng sai mục đích (sau khi đã khấu trừ)
+- Hóa đơn bị hủy, thay thế
+
+```
+Nợ TK 811    Chi phí khác (phần VAT)
+    Có TK 1331   Thuế GTGT đầu vào (giảm)
+```
+
+### 4. VAT hàng nhập khẩu
+
+- Khai thuế tại Chi cục Hải quan
+- VAT NK được khấu trừ nếu đủ điều kiện
+- Kê khai riêng trong tờ khai VAT (mục "Hàng nhập khẩu")
+
+---
+
+## Định dạng Đầu ra
 
 ```json
 {
   "skill": "accounting-tax-vat",
-  "version": "1.0.0",
-  "review_date": "YYYY-MM-DD",
-  "vat_method": "credit",
-  "summary": {
-    "total_output_vat_transactions": 0,
-    "total_output_vat_amount": 0,
-    "total_input_vat_transactions": 0,
-    "total_input_vat_claimed": 0,
-    "total_input_vat_verified": 0,
-    "issues_count": 0,
-    "compliance_status": "PASS|FAIL|WARNING"
+  "version": "1.1.0",
+  "period": { "year": 0, "month": 0, "quarter": 0 },
+  "company_info": { "name": "", "tax_code": "" },
+  "filing_method": "monthly|quarterly",
+  "vat_method": "deduction|direct_value_added|direct_revenue",
+  "output_vat_breakdown": {
+    "by_rate": [
+      { "rate": 0, "revenue_excl_vat": 0, "output_vat": 0 },
+      { "rate": 5, "revenue_excl_vat": 0, "output_vat": 0 },
+      { "rate": 8, "revenue_excl_vat": 0, "output_vat": 0 },
+      { "rate": 10, "revenue_excl_vat": 0, "output_vat": 0 }
+    ],
+    "total_output_vat": 0
   },
-  "output_vat_review": [
-    {
-      "invoice_number": "string",
-      "vat_rate_applied": 0,
-      "vat_rate_correct": true|false,
-      "correct_rate": 0,
-      "legal_reference": "string",
-      "issue": "string|null"
-    }
-  ],
-  "input_vat_review": [
-    {
-      "invoice_number": "string",
-      "vat_amount_claimed": 0,
-      "deductibility": "VERIFIED|CONDITIONAL|FLAGGED",
-      "conditions_met": {
-        "payment_method": true|false,
-        "business_purpose": true|false,
-        "valid_documentation": true|false,
-        "goods_services_received": true|false
-      },
-      "missing_evidence": ["string"],
-      "legal_reference": "string",
-      "issue": "string|null"
-    }
-  ],
-  "vat_refund_eligibility": {
-    "eligible": true|false,
-    "conditions_met": true|false,
-    "documentation_complete": true|false,
-    "missing_documents": ["string"],
-    "legal_reference": "string"
+  "input_vat_breakdown": {
+    "by_rate": [
+      { "rate": 0, "input_vat": 0, "deductible": 0, "non_deductible": 0 },
+      { "rate": 5, "input_vat": 0, "deductible": 0, "non_deductible": 0 },
+      { "rate": 8, "input_vat": 0, "deductible": 0, "non_deductible": 0 },
+      { "rate": 10, "input_vat": 0, "deductible": 0, "non_deductible": 0 }
+    ],
+    "total_deductible": 0
   },
-  "flagged_issues": [
+  "vat_payable": {
+    "output_vat": 0,
+    "input_vat_deductible": 0,
+    "carryover_vat": 0,
+    "adjustments": 0,
+    "vat_payable_this_period": 0
+  },
+  "deduction_conditions_check": {
+    "all_invoices_valid": true,
+    "all_high_value_invoices_have_bank_proof": true,
+    "all_for_business_purpose": true,
+    "all_posted_correctly": true,
+    "issues": []
+  },
+  "rate_reduction_check": {
+    "period_covered": "2025-07-01_to_2026-12-31",
+    "correctly_applied_8_percent": true,
+    "issues": []
+  },
+  "filing_summary": {
+    "total_revenue_excl_vat": 0,
+    "total_output_vat": 0,
+    "total_deductible_input_vat": 0,
+    "vat_to_pay": 0,
+    "vat_overpaid_carryover": 0,
+    "filing_deadline": "YYYY-MM-DD"
+  },
+  "flags": [
     {
-      "severity": "HIGH|MEDIUM|LOW",
-      "category": "string",
-      "description": "string",
-      "invoice_numbers": ["string"],
-      "legal_reference": "string",
-      "recommendation": "string"
+      "flag": "",
+      "severity": "low|medium|high|critical",
+      "description": ""
     }
   ],
-  "references_used": [
-    "Law 48/2024/QH15",
-    "Decree 209/2013/ND-CP",
-    "Decree 174/2025/ND-CP",
-    "Circular 219/2013/TT-BTC"
-  ],
-  "disclaimer": "This skill provides compliance checklist review only. It does not constitute tax advice."
+  "recommendations": [],
+  "disclaimer": "Bản kê khai dự thảo dựa trên dữ liệu user cung cấp. Cần xác minh với sổ sách và tư vấn thuế trước khi nộp chính thức."
 }
 ```
 
 ---
 
-## Anti-Hallucination Rules
+## Quy tắc Chống Ảo giác
 
-**CRITICAL: Follow these rules strictly to prevent incorrect conclusions.**
+### Quy tắc 1: Không bịa thuế suất
 
-### Rule 1: Never State a Rate Without Legal Citation
+Chỉ sử dụng thuế suất đã được xác minh theo Luật VAT hiện hành. Nếu không
+chắc chắn, escalate cho tư vấn thuế.
 
-**WRONG:** "The VAT rate for this service is 10%."
-**CORRECT:** "Based on Article 9(4), Law 48/2024/QH15, the default 10% rate applies to this service category."
+### Quy tắc 2: Không tự ý áp điều kiện khấu trừ
 
-### Rule 2: Never Conclude Deductibility Without Verifying All Conditions
+Kiểm tra đủ 5 điều kiện khấu trừ. Nếu thiếu một điều kiện → flag, KHÔNG
+khấu trừ.
 
-**WRONG:** "Input VAT of X VND is deductible."
-**CORRECT:** "Input VAT of X VND is VERIFIED when all four conditions per Article 14, Law 48/2024/QH15 are met: (1) payment via bank transfer, (2) business purpose, (3) valid documentation, (4) goods/services received."
+### Quy tắc 3: Trích dẫn chính xác
 
-### Rule 3: Label All Examples as Hypothetical
+Khi tham chiếu điều khoản, ghi rõ số hiệu văn bản. KHÔNG bịa điều khoản
+không tồn tại.
 
-**WRONG:** "A construction company purchasing 50M VND of materials can deduct VAT."
-**CORRECT:** "Hypothetical example only: A construction company purchasing 50,000,000 VND of materials with proper bank transfer evidence may claim input VAT deduction if all Article 14 conditions are met."
+### Quy tắc 4: Không tự đánh giá tính hợp lệ của hóa đơn
 
-### Rule 4: Distinguish Between Rate Application and Deduction Eligibility
+Chỉ kiểm tra logic. Việc xác minh mã CQT, MST đang hoạt động phải tra cứu
+trên Cổng thuế.
 
-**WRONG:** "The 10% VAT rate means input VAT is deductible."
-**CORRECT:** "Rate verification (Article 9) and deduction eligibility (Article 14) are separate determinations. A correctly applied VAT rate does not guarantee deductibility."
+### Quy tắc 5: Luôn kèm tuyên bố miễn trừ
 
-### Rule 5: Flag Ambiguous Situations
-
-When encountering unclear cases:
-- State the ambiguity explicitly
-- List possible interpretations with legal references
-- Recommend escalation to qualified tax professional
-- Do NOT guess or assume a resolution
+Mọi đầu ra đều phải có disclaimer.
 
 ---
 
-## Escalation Rules
+## Quy tắc Escalate
 
-**Escalate to qualified tax professional when:**
-
-1. Transaction involves mixed VAT rates that require allocation
-2. Business activities span multiple VAT treatment categories
-3. Legal interpretation is ambiguous or contested
-4. Cross-border transactions with international tax implications
-5. Transactions with related parties requiring transfer pricing analysis
-6. Refund amount exceeds defined thresholds requiring tax authority review
-7. Suspected non-compliance requires voluntary disclosure consideration
-8. Industry-specific VAT treatments are unclear
-9. Temporal applicability of different legal provisions is unclear
-10. Tax authority has issued case-specific guidance
-
-**Escalation Template:**
-
-```
-ESCALATION REQUIRED
-Category: [Category]
-Issue: [Description of ambiguous or complex situation]
-Legal References Considered: [List applicable laws/decrees/circulars]
-Ambiguity: [Specific question or unclear element]
-Recommendation: [Escalate to tax advisor/tax authority consultation]
-```
+| Tình huống | Mức độ | Người nhận |
+|-----------|--------|-----------|
+| Chênh lệch VAT > 50 triệu so với kỳ trước | HIGH | Kế toán trưởng |
+| Nghi ngờ hóa đơn đầu vào giả | CRITICAL | Kế toán trưởng + KTNB |
+| VAT phải nộp > 1 tỷ VND/tháng | HIGH | Kế toán trưởng |
+| Phát hiện nhiều hóa đơn không có chứng từ CK | HIGH | Kế toán trưởng |
+| Sai sót > 100 triệu trong tờ khai | HIGH | Kế toán trưởng + Tư vấn thuế |
+| Yêu cầu hoàn thuế | HIGH | Kế toán trưởng + Tư vấn thuế |
 
 ---
 
-## Legal Disclaimer
+## Tuyên bố Miễn trừ Pháp lý
 
-**This skill provides compliance checklist review only.**
+**QUAN TRỌNG**: Skill này cung cấp hướng dẫn và bản kê khai dự thảo. Không
+phải tư vấn pháp lý. Việc xác định thuế suất, điều kiện khấu trừ cần:
+- Đối chiếu với văn bản pháp luật hiện hành
+- Tư vấn viên thuế có chứng chỉ
+- Quyết định cuối cùng của cơ quan thuế
 
-It is designed to assist with reviewing VAT compliance and verifying evidence against legal requirements. However, this skill:
+**Văn bản tham chiếu chính**:
+- Luật 48/2024/QH15 — Luật Quản lý thuế (thông qua 21/11/2024)
+- Luật Thuế GTGT 2024 — sửa đổi Luật 13/2008/QH12 (có hiệu lực từ
+  01/07/2025)
+- Nghị định 174/2025/NĐ-CP — giảm thuế suất VAT
+- Nghị định 123/2020/NĐ-CP — hóa đơn, chứng từ
+- Thông tư 219/2013/TT-BTC — hướng dẫn VAT
 
-- **Does NOT** constitute professional tax advice
-- **Does NOT** replace consultation with a qualified tax advisor
-- **Does NOT** guarantee tax authority acceptance of claimed deductions
-- **Does NOT** cover all possible VAT scenarios or industry-specific rules
-- **Does NOT** represent opinions or interpretations of tax authorities
+> ⚠️ **Cần xác minh**: Một số điều khoản cụ thể của Luật VAT 2024 và Nghị
+> định 174/2025 có thể đã được sửa đổi hoặc hướng dẫn bổ sung. Tra cứu
+> Cổng thuế điện tử và văn bản mới nhất trước khi áp dụng.
 
-Tax laws are subject to change and may have industry-specific provisions not covered by this skill. For any tax decisions, compliance determinations, or situations with legal ambiguity, consult a qualified Vietnamese tax professional or obtain direct guidance from the General Department of Taxation.
+---
 
-**Legal References:**
-
-- Law 48/2024/QH15 (VAT Law, effective 01/07/2025)
-- Decree 209/2013/ND-CP (VAT Implementation)
-- Decree 174/2025/ND-CP (VAT Reduction)
-- Circular 219/2013/TT-BTC (VAT Deduction Conditions)
-- Circular 93/2017/TT-BTC (Electronic VAT Invoices)
+*Cập nhật lần cuối: 2026-09-09*
+*Phiên bản skill: 1.1.0*
